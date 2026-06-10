@@ -1,28 +1,29 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/router";
 import Link from "next/link";
 import { supabase, ADMIN_EMAIL, ksh, NO_IMAGE } from "../../lib/supabase";
 
 const EMPTY = { title: "", description: "", price: "", image_url: "" };
 const STATUS_STYLE = {
-  pending: "bg-yellow-100 text-yellow-700",
+  pending:   "bg-amber-100 text-amber-700",
   confirmed: "bg-blue-100 text-blue-700",
-  delivered: "bg-green-100 text-green-700",
+  delivered: "bg-emerald-100 text-emerald-700",
 };
 
 export default function SellerDashboard() {
-  const router = useRouter();
-  const [user, setUser] = useState(null);
-  const [profile, setProfile] = useState(null);
-  const [tab, setTab] = useState("products");
-  const [products, setProducts] = useState([]);
-  const [orders, setOrders] = useState([]);
-  const [form, setForm] = useState(EMPTY);
-  const [editing, setEditing] = useState(null);
-  const [showForm, setShowForm] = useState(false);
+  const router   = useRouter();
+  const [user,      setUser]      = useState(null);
+  const [profile,   setProfile]   = useState(null);
+  const [tab,       setTab]       = useState("overview");
+  const [products,  setProducts]  = useState([]);
+  const [orders,    setOrders]    = useState([]);
+  const [form,      setForm]      = useState(EMPTY);
+  const [editing,   setEditing]   = useState(null);
+  const [showForm,  setShowForm]  = useState(false);
   const [uploading, setUploading] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
+  const [saving,    setSaving]    = useState(false);
+  const [error,     setError]     = useState("");
+  const [newOrder,  setNewOrder]  = useState(null);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -31,8 +32,25 @@ export default function SellerDashboard() {
       setUser(session.user);
       loadProfile(session.user.id);
       loadData(session.user.id);
+      subscribeRealtime(session.user.id);
     });
   }, []);
+
+  function subscribeRealtime(uid) {
+    supabase
+      .channel("seller-orders-" + uid)
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "orders" }, (payload) => {
+        if (payload.new.seller_id !== uid) return;
+        setOrders((prev) => [payload.new, ...prev]);
+        setNewOrder(payload.new);
+        setTimeout(() => setNewOrder(null), 6000);
+      })
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "orders" }, (payload) => {
+        if (payload.new.seller_id !== uid) return;
+        setOrders((prev) => prev.map((o) => o.id === payload.new.id ? payload.new : o));
+      })
+      .subscribe();
+  }
 
   async function loadProfile(uid) {
     const { data } = await supabase.from("seller_profiles").select("*").eq("id", uid).single();
@@ -53,11 +71,11 @@ export default function SellerDashboard() {
     if (!file) return;
     setUploading(true);
     setError("");
-    const ext = file.name.split(".").pop();
+    const ext  = file.name.split(".").pop();
     const path = `${user.id}/${Date.now()}.${ext}`;
-    const { data, error } = await supabase.storage.from("product-images").upload(path, file, { upsert: true });
-    if (error) {
-      setError("Image upload failed. Make sure the 'product-images' storage bucket exists and is public — or paste an image URL below instead.");
+    const { data, error: upErr } = await supabase.storage.from("product-images").upload(path, file, { upsert: true });
+    if (upErr) {
+      setError("Image upload failed. Check that the 'product-images' bucket exists and is public — or paste an image URL below.");
     } else {
       const { data: pub } = supabase.storage.from("product-images").getPublicUrl(data.path);
       setForm((f) => ({ ...f, image_url: pub.publicUrl }));
@@ -71,11 +89,11 @@ export default function SellerDashboard() {
     setSaving(true);
     setError("");
     const payload = {
-      title: form.title.trim(),
+      title:       form.title.trim(),
       description: form.description.trim(),
-      price: Number(form.price),
-      image_url: form.image_url,
-      seller_id: user.id,
+      price:       Number(form.price),
+      image_url:   form.image_url,
+      seller_id:   user.id,
       seller_name: profile?.business_name || user.email,
     };
     const res = editing
@@ -101,90 +119,168 @@ export default function SellerDashboard() {
 
   function cancelForm() { setForm(EMPTY); setEditing(null); setShowForm(false); setError(""); }
 
-  const pendingCount = orders.filter((o) => o.status === "pending").length;
+  const totalRevenue    = orders.reduce((s, o) => s + o.product_price, 0);
+  const deliveredRev    = orders.filter((o) => o.status === "delivered").reduce((s, o) => s + o.product_price, 0);
+  const pendingOrders   = orders.filter((o) => o.status === "pending");
+  const confirmedOrders = orders.filter((o) => o.status === "confirmed");
+
+  const productCounts = {};
+  orders.forEach((o) => {
+    if (o.product_title) productCounts[o.product_title] = (productCounts[o.product_title] || 0) + 1;
+  });
+  const topProduct = Object.entries(productCounts).sort((a, b) => b[1] - a[1])[0];
+
+  const stats = [
+    { icon: "💰", label: "Total Revenue",   value: ksh(totalRevenue),    sub: `${ksh(deliveredRev)} delivered` },
+    { icon: "📋", label: "Total Orders",    value: orders.length,         sub: `${confirmedOrders.length} confirmed` },
+    { icon: "⏳", label: "Pending Orders",  value: pendingOrders.length,  sub: "need your attention", alert: pendingOrders.length > 0 },
+    { icon: "📦", label: "Products Listed", value: products.length,       sub: topProduct ? `Top: ${topProduct[0]}` : "Add products to start selling" },
+  ];
 
   if (!user) return <div className="min-h-screen flex items-center justify-center text-gray-400">Loading…</div>;
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <nav className="bg-white border-b sticky top-0 z-10">
-        <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
-          <Link href="/" className="text-xl font-bold text-green-600">🛍️ Soko Yangu</Link>
+      {newOrder && (
+        <div className="fixed top-4 right-4 z-50 bg-emerald-600 text-white px-5 py-4 rounded-2xl shadow-2xl max-w-xs animate-bounce">
+          <p className="font-bold text-base">🛍️ New Order!</p>
+          <p className="text-sm text-emerald-100 mt-1">{newOrder.product_title} — {newOrder.buyer_name}</p>
+          <button onClick={() => setNewOrder(null)} className="absolute top-2 right-3 text-white/60 hover:text-white text-lg">×</button>
+        </div>
+      )}
+
+      <nav className="bg-white border-b border-gray-100 sticky top-0 z-30">
+        <div className="max-w-5xl mx-auto px-4 h-14 flex items-center justify-between">
+          <Link href="/" className="text-xl font-black text-emerald-600 tracking-tight">Soko Yangu</Link>
           <div className="flex items-center gap-3">
-            <span className="text-sm text-gray-500 hidden sm:block">{profile?.business_name || user.email}</span>
-            <button onClick={() => supabase.auth.signOut().then(() => router.push("/"))}
-              className="text-sm text-gray-500 hover:text-red-600">Logout</button>
+            <span className="text-sm text-gray-500 hidden sm:block font-medium">{profile?.business_name || user.email}</span>
+            <button
+              onClick={() => supabase.auth.signOut().then(() => router.push("/"))}
+              className="text-sm text-gray-400 hover:text-red-600 font-medium transition-colors"
+            >
+              Logout
+            </button>
           </div>
         </div>
       </nav>
 
       <div className="max-w-5xl mx-auto px-4 py-6">
-        <h1 className="text-2xl font-bold text-gray-900 mb-1">Seller Dashboard</h1>
-        <p className="text-gray-500 text-sm mb-6">{profile?.business_name || "Your Shop"}</p>
-
-        <div className="flex gap-2 mb-6">
-          <TabBtn active={tab === "products"} onClick={() => setTab("products")}>📦 Products ({products.length})</TabBtn>
-          <TabBtn active={tab === "orders"} onClick={() => setTab("orders")} badge={pendingCount}>📋 Orders ({orders.length})</TabBtn>
+        <div className="mb-6">
+          <h1 className="text-2xl font-black text-gray-900">{profile?.business_name || "Your Shop"}</h1>
+          <p className="text-gray-400 text-sm mt-0.5">Seller Dashboard</p>
         </div>
+
+        <div className="flex gap-2 mb-7">
+          <TabBtn active={tab === "overview"} onClick={() => setTab("overview")}>📊 Overview</TabBtn>
+          <TabBtn active={tab === "products"} onClick={() => setTab("products")}>📦 Products ({products.length})</TabBtn>
+          <TabBtn active={tab === "orders"}   onClick={() => setTab("orders")}   badge={pendingOrders.length}>
+            📋 Orders ({orders.length})
+          </TabBtn>
+        </div>
+
+        {tab === "overview" && (
+          <div>
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+              {stats.map((s) => (
+                <div key={s.label} className={`bg-white rounded-2xl p-5 border-2 ${s.alert ? "border-amber-200 bg-amber-50/40" : "border-gray-100"}`}>
+                  <div className="text-2xl mb-2">{s.icon}</div>
+                  <div className={`text-2xl font-black ${s.alert ? "text-amber-600" : "text-gray-900"}`}>{s.value}</div>
+                  <div className="text-xs font-semibold text-gray-500 mt-1">{s.label}</div>
+                  <div className="text-xs text-gray-400 mt-0.5 truncate">{s.sub}</div>
+                </div>
+              ))}
+            </div>
+            <div className="mb-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="font-black text-gray-900">Recent Orders</h2>
+                <button onClick={() => setTab("orders")} className="text-sm text-emerald-600 font-semibold hover:underline">View all →</button>
+              </div>
+              {orders.length === 0 ? (
+                <div className="bg-white rounded-2xl border border-gray-100 text-center py-12 text-gray-400">
+                  <div className="text-4xl mb-2">📋</div>
+                  <p className="font-medium">No orders yet</p>
+                  <p className="text-sm mt-1">Share your shop link to start getting orders</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {orders.slice(0, 5).map((o) => <OrderCard key={o.id} order={o} />)}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         {tab === "products" && (
           <div>
             {!showForm && (
-              <button onClick={() => setShowForm(true)}
-                className="mb-6 bg-green-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-green-700">
+              <button onClick={() => setShowForm(true)} className="mb-6 bg-emerald-600 text-white px-5 py-2.5 rounded-xl font-bold hover:bg-emerald-700 transition-colors">
                 + Add New Product
               </button>
             )}
-
             {showForm && (
-              <div className="bg-white rounded-2xl shadow-sm p-6 mb-6">
-                <h2 className="text-lg font-bold mb-4">{editing ? "Edit Product" : "Add New Product"}</h2>
-                {error && <div className="bg-red-50 text-red-700 text-sm px-4 py-3 rounded-lg mb-4">{error}</div>}
+              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 mb-6">
+                <h2 className="text-lg font-black text-gray-900 mb-5">{editing ? "Edit Product" : "Add New Product"}</h2>
+                {error && <div className="bg-red-50 border border-red-100 text-red-700 text-sm px-4 py-3 rounded-xl mb-4">{error}</div>}
                 <form onSubmit={handleSave} className="space-y-4">
                   <Field label="Product Title *" value={form.title} onChange={(v) => setForm({ ...form, title: v })} placeholder="e.g. Fresh Avocados (1kg)" />
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
-                    <textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} rows={3}
+                    <label className="block text-sm font-semibold text-gray-700 mb-1">Description</label>
+                    <textarea
+                      value={form.description}
+                      onChange={(e) => setForm({ ...form, description: e.target.value })}
+                      rows={3}
                       placeholder="Describe your product…"
-                      className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:border-green-500 resize-none" />
+                      className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:border-emerald-500 resize-none text-sm"
+                    />
                   </div>
                   <Field label="Price (KSh) *" type="number" value={form.price} onChange={(v) => setForm({ ...form, price: v })} placeholder="500" />
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Product Image</label>
-                    <input type="file" accept="image/*" onChange={handleImageUpload}
-                      className="w-full text-sm text-gray-500 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-green-50 file:text-green-700 hover:file:bg-green-100" />
+                    <label className="block text-sm font-semibold text-gray-700 mb-1">Product Image</label>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleImageUpload}
+                      className="w-full text-sm text-gray-500 file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:bg-emerald-50 file:text-emerald-700 file:font-semibold hover:file:bg-emerald-100"
+                    />
                     {uploading && <p className="text-xs text-gray-400 mt-1">Uploading…</p>}
-                    <input type="text" value={form.image_url} onChange={(e) => setForm({ ...form, image_url: e.target.value })}
+                    <input
+                      type="text"
+                      value={form.image_url}
+                      onChange={(e) => setForm({ ...form, image_url: e.target.value })}
                       placeholder="…or paste an image URL"
-                      className="w-full mt-2 px-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-green-500" />
-                    {form.image_url && <img src={form.image_url} alt="Preview" className="mt-2 h-24 w-24 object-cover rounded-lg border" onError={(e) => { e.target.style.display = "none"; }} />}
+                      className="w-full mt-2 px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-emerald-500"
+                    />
+                    {form.image_url && (
+                      <img src={form.image_url} alt="Preview" className="mt-2 h-24 w-24 object-cover rounded-xl border border-gray-100" onError={(e) => { e.target.style.display = "none"; }} />
+                    )}
                   </div>
-                  <div className="flex gap-3">
-                    <button type="submit" disabled={saving}
-                      className="bg-green-600 text-white px-6 py-2 rounded-lg font-medium hover:bg-green-700 disabled:opacity-50">
+                  <div className="flex gap-3 pt-1">
+                    <button type="submit" disabled={saving} className="bg-emerald-600 text-white px-6 py-2.5 rounded-xl font-bold hover:bg-emerald-700 disabled:opacity-50 transition-colors">
                       {saving ? "Saving…" : editing ? "Save Changes" : "Add Product"}
                     </button>
-                    <button type="button" onClick={cancelForm}
-                      className="bg-gray-100 text-gray-700 px-6 py-2 rounded-lg font-medium hover:bg-gray-200">Cancel</button>
+                    <button type="button" onClick={cancelForm} className="bg-gray-100 text-gray-700 px-6 py-2.5 rounded-xl font-bold hover:bg-gray-200 transition-colors">Cancel</button>
                   </div>
                 </form>
               </div>
             )}
-
             {products.length === 0 ? (
-              <Empty>No products yet. Add your first one!</Empty>
+              <div className="bg-white rounded-2xl border border-gray-100 text-center py-16 text-gray-400">
+                <div className="text-5xl mb-3">📦</div>
+                <p className="font-semibold">No products yet</p>
+                <p className="text-sm mt-1">Add your first product to start selling</p>
+              </div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 {products.map((p) => (
-                  <div key={p.id} className="bg-white rounded-xl border overflow-hidden">
-                    <img src={p.image_url || NO_IMAGE} alt={p.title} className="w-full h-36 object-cover bg-gray-100" onError={(e) => { e.target.src = NO_IMAGE; }} />
+                  <div key={p.id} className="bg-white rounded-2xl border border-gray-100 overflow-hidden hover:shadow-md transition-shadow">
+                    <img src={p.image_url || NO_IMAGE} alt={p.title} className="w-full aspect-square object-cover bg-gray-100" onError={(e) => { e.target.src = NO_IMAGE; }} />
                     <div className="p-4">
-                      <h3 className="font-semibold text-gray-900">{p.title}</h3>
-                      <p className="text-green-600 font-bold mt-1">{ksh(p.price)}</p>
-                      {p.description && <p className="text-gray-500 text-xs mt-1 line-clamp-2">{p.description}</p>}
-                      <div className="flex gap-2 mt-3">
-                        <button onClick={() => startEdit(p)} className="flex-1 text-sm bg-gray-100 text-gray-700 py-1.5 rounded-lg hover:bg-gray-200">Edit</button>
-                        <button onClick={() => handleDelete(p.id)} className="flex-1 text-sm bg-red-50 text-red-600 py-1.5 rounded-lg hover:bg-red-100">Delete</button>
+                      <h3 className="font-bold text-gray-900 line-clamp-2 leading-snug">{p.title}</h3>
+                      <p className="text-emerald-600 font-black text-lg mt-1">{ksh(p.price)}</p>
+                      {p.description && <p className="text-gray-500 text-xs mt-1.5 line-clamp-2">{p.description}</p>}
+                      <div className="flex gap-2 mt-4">
+                        <button onClick={() => startEdit(p)} className="flex-1 text-sm bg-gray-100 text-gray-700 py-2 rounded-xl font-semibold hover:bg-gray-200 transition-colors">Edit</button>
+                        <button onClick={() => handleDelete(p.id)} className="flex-1 text-sm bg-red-50 text-red-600 py-2 rounded-xl font-semibold hover:bg-red-100 transition-colors">Delete</button>
                       </div>
                     </div>
                   </div>
@@ -195,24 +291,16 @@ export default function SellerDashboard() {
         )}
 
         {tab === "orders" && (
-          <div className="space-y-3">
+          <div>
             {orders.length === 0 ? (
-              <Empty>No orders yet.</Empty>
+              <div className="bg-white rounded-2xl border border-gray-100 text-center py-16 text-gray-400">
+                <div className="text-5xl mb-3">📋</div>
+                <p className="font-semibold">No orders yet</p>
+              </div>
             ) : (
-              orders.map((o) => (
-                <div key={o.id} className="bg-white rounded-xl border p-4">
-                  <div className="flex items-start justify-between gap-4 flex-wrap">
-                    <div>
-                      <p className="font-semibold text-gray-900">{o.product_title}</p>
-                      <p className="text-green-600 font-bold">{ksh(o.product_price)}</p>
-                      <p className="text-sm text-gray-600 mt-2">👤 {o.buyer_name} · 📞 {o.buyer_phone}</p>
-                      <p className="text-sm text-gray-600">📍 {o.delivery_location}</p>
-                      <p className="text-xs text-gray-400 mt-1">{new Date(o.created_at).toLocaleString("en-KE")}</p>
-                    </div>
-                    <span className={`text-xs font-semibold px-3 py-1 rounded-full ${STATUS_STYLE[o.status]}`}>{o.status}</span>
-                  </div>
-                </div>
-              ))
+              <div className="space-y-3">
+                {orders.map((o) => <OrderCard key={o.id} order={o} />)}
+              </div>
             )}
           </div>
         )}
@@ -221,12 +309,41 @@ export default function SellerDashboard() {
   );
 }
 
+function OrderCard({ order: o }) {
+  return (
+    <div className="bg-white rounded-2xl border border-gray-100 p-4">
+      <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <p className="font-bold text-gray-900">{o.product_title}</p>
+            <p className="text-emerald-600 font-black">{ksh(o.product_price)}</p>
+          </div>
+          <p className="text-sm text-gray-600 mt-1.5">👤 {o.buyer_name} · 📞 {o.buyer_phone}</p>
+          <p className="text-sm text-gray-600">📍 {o.delivery_location}</p>
+          <p className="text-xs text-gray-400 mt-1">{new Date(o.created_at).toLocaleString("en-KE")}</p>
+        </div>
+        <span className={`text-xs font-bold px-3 py-1.5 rounded-full flex-shrink-0 ${STATUS_STYLE[o.status] || "bg-gray-100 text-gray-600"}`}>
+          {o.status}
+        </span>
+      </div>
+    </div>
+  );
+}
+
 function TabBtn({ active, onClick, children, badge }) {
   return (
-    <button onClick={onClick}
-      className={`relative px-4 py-2 rounded-lg text-sm font-medium transition-colors ${active ? "bg-green-600 text-white" : "bg-white text-gray-600 hover:bg-gray-100 border"}`}>
+    <button
+      onClick={onClick}
+      className={`relative px-4 py-2 rounded-xl text-sm font-bold transition-all ${
+        active ? "bg-emerald-600 text-white shadow-sm" : "bg-white text-gray-600 hover:bg-gray-100 border border-gray-200"
+      }`}
+    >
       {children}
-      {badge > 0 && <span className="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-xs rounded-full min-w-[20px] h-5 px-1 flex items-center justify-center">{badge}</span>}
+      {badge > 0 && (
+        <span className="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-xs rounded-full min-w-[20px] h-5 px-1 flex items-center justify-center">
+          {badge}
+        </span>
+      )}
     </button>
   );
 }
@@ -234,13 +351,14 @@ function TabBtn({ active, onClick, children, badge }) {
 function Field({ label, type = "text", value, onChange, placeholder }) {
   return (
     <div>
-      <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
-      <input type={type} value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder}
-        className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:border-green-500" />
+      <label className="block text-sm font-semibold text-gray-700 mb-1">{label}</label>
+      <input
+        type={type}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:border-emerald-500 transition-colors"
+      />
     </div>
   );
-}
-
-function Empty({ children }) {
-  return <div className="text-center py-16 text-gray-400 bg-white rounded-2xl border">{children}</div>;
 }
