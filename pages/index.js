@@ -13,7 +13,7 @@ const AVATAR_COLORS = [
   ["bg-sky-100 dark:bg-sky-950",       "text-sky-700 dark:text-sky-300"],
 ];
 
-// âââ Cart Drawer ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+// âââ Cart Drawer âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 function CartDrawer({ open, onClose, sellers }) {
   const { items, remove, updateQty, clear, total, count } = useCart();
   const [step, setStep]       = useState("items"); // items | form | success
@@ -295,8 +295,8 @@ export default function Home() {
             >
               {dark ? "â" : "â½"}
             </button>
-            <Link href="/seller/login" className="hidden sm:block text-sm font-semibold text-gray-500 dark:text-[#a0a0a0] hover:text-gray-900 dark:hover:text-white transition-colors px-2">
-              Seller Login
+            <Link href="/seller/login" className="hidden sm:flex items-center gap-1.5 text-sm font-bold px-3 py-1.5 rounded-xl bg-gray-100 dark:bg-[#1a1a1a] text-gray-700 dark:text-[#a0a0a0] hover:bg-gray-200 dark:hover:bg-[#2a2a2a] hover:text-gray-900 dark:hover:text-white transition-colors">
+              ðª Seller Login
             </Link>
             <button
               onClick={() => setCartOpen(true)}
@@ -313,27 +313,15 @@ export default function Home() {
         </div>
       </nav>
 
-      {/* Hero â removed in Item 2 */}
-      <div className="bg-gray-900 dark:bg-[#141414] text-white">
-        <div className="max-w-2xl mx-auto px-4 py-12 text-center">
-          <h1 className="text-3xl sm:text-4xl font-black mb-2 tracking-tight">Your Local Marketplace</h1>
-          <p className="text-gray-400 mb-7 text-base">Order from shops near you Â· Pay cash on delivery</p>
-          {/* Mobile search */}
-          <div className="sm:hidden">
-            <input
-              type="text"
-              placeholder="Search productsâ¦"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="w-full px-5 py-3.5 rounded-2xl text-gray-900 text-base focus:outline-none shadow-lg"
-            />
-          </div>
-          <div className="hidden sm:flex justify-center gap-3 mt-1">
-            {["ðï¸ Browse Products", "ðµ Pay on Delivery", "ð² WhatsApp Support"].map((t) => (
-              <span key={t} className="text-xs bg-white/10 px-3 py-1.5 rounded-full font-medium">{t}</span>
-            ))}
-          </div>
-        </div>
+      {/* Mobile search bar */}
+      <div className="sm:hidden px-4 py-3 border-b border-gray-100 dark:border-[#2a2a2a] bg-white dark:bg-[#0a0a0a]">
+        <input
+          type="text"
+          placeholder="Search productsâ¦"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="w-full px-4 py-2.5 border border-gray-200 dark:border-[#2a2a2a] rounded-full text-sm bg-gray-50 dark:bg-[#141414] text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-[#555] focus:outline-none focus:border-gray-900 dark:focus:border-white transition-colors"
+        />
       </div>
 
       {/* Main content */}
