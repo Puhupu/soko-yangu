@@ -44,7 +44,9 @@ export default function SellerSignup() {
   return (
     <AuthShell title="Create Seller Account" subtitle="Start selling on Soko Yangu today.">
       {error && (
-        <div className="bg-amber-50 text-amber-800 text-sm px-4 py-3 rounded-xl mb-4 border border-amber-100">{error}</div>
+        <div className="bg-amber-50 dark:bg-amber-950 text-amber-800 dark:text-amber-300 text-sm px-4 py-3 rounded-xl mb-4 border border-amber-100 dark:border-amber-900">
+          {error}
+        </div>
       )}
       <form onSubmit={handleSignup} className="space-y-4">
         <Input label="Business / Shop Name" value={form.business_name} onChange={(v) => setForm({ ...form, business_name: v })} placeholder="e.g. Mama Njeri's Shop" />
@@ -54,14 +56,14 @@ export default function SellerSignup() {
         <button
           type="submit"
           disabled={loading}
-          className="w-full bg-emerald-600 text-white py-3 rounded-xl font-bold hover:bg-emerald-700 disabled:opacity-50 transition-colors"
+          className="w-full bg-gray-900 text-white dark:bg-white dark:text-black py-3 rounded-xl font-bold hover:bg-gray-700 dark:hover:bg-gray-100 disabled:opacity-50 transition-colors"
         >
           {loading ? "Creating account…" : "Create Account"}
         </button>
       </form>
-      <p className="text-sm text-gray-500 text-center mt-4">
+      <p className="text-sm text-gray-500 dark:text-[#a0a0a0] text-center mt-5">
         Have an account?{" "}
-        <Link href="/seller/login" className="text-emerald-600 font-semibold hover:underline">Sign in</Link>
+        <Link href="/seller/login" className="text-gray-900 dark:text-white font-semibold hover:underline">Sign in →</Link>
       </p>
     </AuthShell>
   );
