@@ -14,9 +14,7 @@ export default function ProductPage() {
   const [loading,    setLoading]    = useState(true);
   const [form,       setForm]       = useState({ name: "", phone: "", location: "" });
   const [submitting, setSubmitting] = useState(false);
-  const [success,    setSuccess]    = useState(false);
   const [error,      setError]      = useState("");
-  const [vendorWA,   setVendorWA]   = useState(null); // {url, name} after order success
   const [cartFlash,  setCartFlash]  = useState(false);
 
   useEffect(() => {
@@ -35,16 +33,21 @@ export default function ProductPage() {
     }
     setSubmitting(true);
     setError("");
-    const { error: insertErr } = await supabase.from("orders").insert({
-      product_id:        product.id,
-      product_title:     product.title,
-      product_price:     product.price,
-      seller_id:         product.seller_id,
-      buyer_name:        form.name.trim(),
-      buyer_phone:       form.phone.trim(),
-      delivery_location: form.location.trim(),
-      status:            "pending",
-    });
+    const { data: inserted, error: insertErr } = await supabase
+      .from("orders")
+      .insert({
+        product_id:        product.id,
+        product_title:     product.title,
+        product_price:     product.price,
+        seller_id:         product.seller_id,
+        buyer_name:        form.name.trim(),
+        buyer_phone:       form.phone.trim(),
+        delivery_location: form.location.trim(),
+        status:            "pending",
+      })
+      .select()
+      .single();
+
     if (insertErr) {
       setSubmitting(false);
       setError("Could not place order. Please try again.");
@@ -61,17 +64,15 @@ export default function ProductPage() {
     if (sp?.phone) {
       const phone = "254" + String(sp.phone).replace(/\D/g, "").replace(/^0/, "");
       const msg   = encodeURIComponent(
-        `ðï¸ New Order â Soko Yangu\n\nProduct: ${product.title}\nPrice: ${ksh(product.price)}\n\nBuyer: ${form.name.trim()}\nPhone: ${form.phone.trim()}\nLocation: ${form.location.trim()}`
+        `🛍️ New Order — Soko Yangu\n\nProduct: ${product.title}\nPrice: ${ksh(product.price)}\n\nBuyer: ${form.name.trim()}\nPhone: ${form.phone.trim()}\nLocation: ${form.location.trim()}`
       );
-      const waUrl = `https://wa.me/${phone}?text=${msg}`;
-      setVendorWA({ url: waUrl, name: sp.business_name });
-      // Auto-open WhatsApp to notify vendor (Item 6)
-      window.open(waUrl, "_blank");
+      // Auto-open WhatsApp to notify vendor
+      window.open(`https://wa.me/${phone}?text=${msg}`, "_blank");
     }
 
     setSubmitting(false);
-    setSuccess(true);
-    window.scrollTo(0, 0);
+    // Redirect to dedicated order confirmation page
+    router.push(`/order/confirm?id=${inserted.id}`);
   }
 
   function handleAddToCart() {
@@ -82,14 +83,14 @@ export default function ProductPage() {
 
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center bg-white dark:bg-[#0a0a0a]">
-      <div className="text-gray-400 dark:text-[#a0a0a0]">Loadingâ¦</div>
+      <div className="text-gray-400 dark:text-[#a0a0a0]">Loading…</div>
     </div>
   );
   if (!product) return (
     <div className="min-h-screen flex flex-col items-center justify-center text-gray-400 gap-3 bg-white dark:bg-[#0a0a0a]">
-      <div className="text-5xl">ð</div>
+      <div className="text-5xl">🔍</div>
       <p className="font-medium text-gray-500 dark:text-[#a0a0a0]">Product not found.</p>
-      <Link href="/" className="text-gray-900 dark:text-white font-semibold hover:underline">â Back to shop</Link>
+      <Link href="/" className="text-gray-900 dark:text-white font-semibold hover:underline">← Back to shop</Link>
     </div>
   );
 
@@ -105,10 +106,10 @@ export default function ProductPage() {
               className="w-9 h-9 flex items-center justify-center rounded-full text-gray-400 dark:text-[#a0a0a0] hover:bg-gray-100 dark:hover:bg-[#1a1a1a] transition-colors text-base"
               title={dark ? "Switch to light mode" : "Switch to dark mode"}
             >
-              {dark ? "â" : "â½"}
+              {dark ? "☀" : "☽"}
             </button>
             <Link href="/" className="relative w-10 h-10 flex items-center justify-center rounded-full hover:bg-gray-100 dark:hover:bg-[#1a1a1a] transition-colors">
-              <span className="text-xl">ð</span>
+              <span className="text-xl">🛒</span>
               {count > 0 && (
                 <span className="absolute -top-0.5 -right-0.5 bg-gray-900 dark:bg-white text-white dark:text-black text-xs font-bold rounded-full min-w-[18px] h-[18px] px-1 flex items-center justify-center leading-none">
                   {count}
@@ -120,9 +121,15 @@ export default function ProductPage() {
       </nav>
 
       <div className="max-w-3xl mx-auto px-4 py-6">
-        <Link href="/" className="text-sm text-gray-500 dark:text-[#a0a0a0] hover:text-gray-900 dark:hover:text-white font-medium transition-colors">
-          â Back to shop
-        </Link>
+        <button
+          onClick={() => router.back()}
+          className="inline-flex items-center gap-2 text-sm text-gray-500 dark:text-[#a0a0a0] hover:text-gray-900 dark:hover:text-white font-medium transition-colors group"
+        >
+          <span className="w-7 h-7 rounded-full border border-gray-200 dark:border-[#2a2a2a] flex items-center justify-center group-hover:border-gray-400 dark:group-hover:border-[#555] transition-colors text-xs">
+            ←
+          </span>
+          Back
+        </button>
 
         {/* Product card */}
         <div className="bg-white dark:bg-[#141414] rounded-2xl overflow-hidden shadow-sm mt-4 border border-gray-100 dark:border-[#2a2a2a]">
@@ -143,7 +150,7 @@ export default function ProductPage() {
             )}
             <div className="mt-5 flex flex-wrap gap-3">
               <span className="inline-flex items-center bg-gray-100 dark:bg-[#1a1a1a] text-gray-700 dark:text-[#a0a0a0] text-sm px-3 py-1.5 rounded-full font-semibold border border-gray-200 dark:border-[#2a2a2a]">
-                ðµ Cash on Delivery
+                💵 Cash on Delivery
               </span>
               <button
                 onClick={handleAddToCart}
@@ -153,62 +160,30 @@ export default function ProductPage() {
                     : "border-gray-300 dark:border-[#2a2a2a] text-gray-700 dark:text-[#a0a0a0] hover:bg-gray-100 dark:hover:bg-[#1a1a1a]"
                 }`}
               >
-                {cartFlash ? "Added to Cart â" : "+ Add to Cart"}
+                {cartFlash ? "Added to Cart ✓" : "+ Add to Cart"}
               </button>
             </div>
           </div>
         </div>
 
-        {/* Order form / success */}
+        {/* Order form */}
         <div className="bg-white dark:bg-[#141414] rounded-2xl shadow-sm mt-6 p-6 border border-gray-100 dark:border-[#2a2a2a]">
-          {success ? (
-            <div className="text-center py-8">
-              <div className="text-6xl mb-4">ð</div>
-              <h2 className="text-2xl font-black text-gray-900 dark:text-white">Order placed!</h2>
-              <p className="text-gray-500 dark:text-[#a0a0a0] mt-2">
-                The seller will contact you at <strong className="text-gray-900 dark:text-white">{form.phone}</strong> to arrange delivery.
-              </p>
-              <p className="text-gray-900 dark:text-white font-bold mt-2">You&apos;ll pay {ksh(product.price)} on delivery.</p>
-
-              {vendorWA && (
-                <div className="mt-7">
-                  <p className="text-sm text-gray-500 dark:text-[#a0a0a0] mb-3">WhatsApp opened automatically. Tap below if it didn&apos;t open:</p>
-                  <a
-                    href={vendorWA.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-3 bg-gray-900 text-white dark:bg-white dark:text-black px-6 py-3 rounded-2xl font-bold text-sm hover:bg-gray-700 dark:hover:bg-gray-100 transition-colors shadow-sm"
-                  >
-                    <span className="text-lg">ð²</span>
-                    WhatsApp {vendorWA.name}
-                  </a>
-                </div>
-              )}
-
-              <Link href="/" className="mt-7 inline-block bg-gray-100 dark:bg-[#1a1a1a] text-gray-700 dark:text-[#a0a0a0] px-6 py-2.5 rounded-xl font-semibold hover:bg-gray-200 dark:hover:bg-[#2a2a2a] transition-colors">
-                Continue Shopping â
-              </Link>
-            </div>
-          ) : (
-            <>
-              <h2 className="text-lg font-black text-gray-900 dark:text-white mb-5">ð¦ Place Your Order</h2>
-              {error && (
-                <div className="bg-red-50 border border-red-100 text-red-700 text-sm px-4 py-3 rounded-xl mb-4">{error}</div>
-              )}
-              <form onSubmit={handleOrder} className="space-y-4">
-                <Field label="Your Name"         value={form.name}     onChange={(v) => setForm({ ...form, name: v })}     placeholder="e.g. John Kamau" />
-                <Field label="Phone / WhatsApp"  value={form.phone}    onChange={(v) => setForm({ ...form, phone: v })}    placeholder="07xx xxx xxx" type="tel" />
-                <Field label="Delivery Location" value={form.location} onChange={(v) => setForm({ ...form, location: v })} placeholder="e.g. Syokimau, Phase 3" />
-                <button
-                  type="submit"
-                  disabled={submitting}
-                  className="w-full bg-gray-900 text-white dark:bg-white dark:text-black py-3.5 rounded-2xl font-black text-base hover:bg-gray-700 dark:hover:bg-gray-100 disabled:opacity-50 transition-colors mt-2"
-                >
-                  {submitting ? "Placing orderâ¦" : `Order Now Â· ${ksh(product.price)}`}
-                </button>
-              </form>
-            </>
+          <h2 className="text-lg font-black text-gray-900 dark:text-white mb-5">📦 Place Your Order</h2>
+          {error && (
+            <div className="bg-red-50 dark:bg-red-950 border border-red-100 dark:border-red-900 text-red-700 dark:text-red-300 text-sm px-4 py-3 rounded-xl mb-4">{error}</div>
           )}
+          <form onSubmit={handleOrder} className="space-y-4">
+            <Field label="Your Name"         value={form.name}     onChange={(v) => setForm({ ...form, name: v })}     placeholder="e.g. John Kamau" />
+            <Field label="Phone / WhatsApp"  value={form.phone}    onChange={(v) => setForm({ ...form, phone: v })}    placeholder="07xx xxx xxx" type="tel" />
+            <Field label="Delivery Location" value={form.location} onChange={(v) => setForm({ ...form, location: v })} placeholder="e.g. Syokimau, Phase 3" />
+            <button
+              type="submit"
+              disabled={submitting}
+              className="w-full bg-gray-900 text-white dark:bg-white dark:text-black py-3.5 rounded-2xl font-black text-base hover:bg-gray-700 dark:hover:bg-gray-100 disabled:opacity-50 transition-colors mt-2"
+            >
+              {submitting ? "Placing order…" : `Order Now · ${ksh(product.price)}`}
+            </button>
+          </form>
         </div>
       </div>
     </div>

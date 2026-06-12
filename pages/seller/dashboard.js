@@ -4,7 +4,8 @@ import Link from "next/link";
 import { supabase, ADMIN_EMAIL, ksh, NO_IMAGE } from "../../lib/supabase";
 import { useTheme } from "../../lib/ThemeContext";
 
-const EMPTY = { title: "", description: "", price: "", image_url: "" };
+const CATEGORIES = ["Groceries", "Produce", "Beverages", "Household", "Food & Snacks", "Services", "Other"];
+const EMPTY = { title: "", description: "", price: "", image_url: "", category: "Other" };
 const STATUS_STYLE = {
   pending:   "bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-300",
   confirmed: "bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300",
@@ -95,6 +96,7 @@ export default function SellerDashboard() {
       description: form.description.trim(),
       price:       Number(form.price),
       image_url:   form.image_url,
+      category:    form.category || "Other",
       seller_id:   user.id,
       seller_name: profile?.business_name || user.email,
     };
@@ -114,13 +116,14 @@ export default function SellerDashboard() {
   }
 
   function startEdit(p) {
-    setForm({ title: p.title, description: p.description || "", price: p.price, image_url: p.image_url || "" });
+    setForm({ title: p.title, description: p.description || "", price: p.price, image_url: p.image_url || "", category: p.category || "Other" });
     setEditing(p.id); setShowForm(true); setError("");
     window.scrollTo(0, 0);
   }
 
   function cancelForm() { setForm(EMPTY); setEditing(null); setShowForm(false); setError(""); }
 
+  // Analytics
   const totalRevenue    = orders.reduce((s, o) => s + o.product_price, 0);
   const deliveredRev    = orders.filter((o) => o.status === "delivered").reduce((s, o) => s + o.product_price, 0);
   const pendingOrders   = orders.filter((o) => o.status === "pending");
@@ -146,6 +149,7 @@ export default function SellerDashboard() {
 
   return (
     <div className="min-h-screen bg-white dark:bg-[#0a0a0a] transition-colors duration-200">
+      {/* New order toast */}
       {newOrder && (
         <div className="fixed top-4 right-4 z-50 bg-gray-900 dark:bg-white text-white dark:text-black px-5 py-4 rounded-2xl shadow-2xl max-w-xs animate-bounce">
           <p className="font-bold text-base">🛍️ New Order!</p>
@@ -154,18 +158,23 @@ export default function SellerDashboard() {
         </div>
       )}
 
+      {/* Nav */}
       <nav className="bg-white dark:bg-[#0a0a0a] border-b border-gray-100 dark:border-[#2a2a2a] sticky top-0 z-30 transition-colors duration-200">
         <div className="max-w-5xl mx-auto px-4 h-14 flex items-center justify-between">
           <Link href="/" className="text-xl font-black text-gray-900 dark:text-white tracking-tight">Soko Yangu</Link>
           <div className="flex items-center gap-3">
-            <button onClick={toggle}
+            <button
+              onClick={toggle}
               className="w-9 h-9 flex items-center justify-center rounded-full text-gray-400 dark:text-[#a0a0a0] hover:bg-gray-100 dark:hover:bg-[#1a1a1a] transition-colors text-base"
-              title={dark ? "Switch to light mode" : "Switch to dark mode"}>
+              title={dark ? "Switch to light mode" : "Switch to dark mode"}
+            >
               {dark ? "☀" : "☽"}
             </button>
             <span className="text-sm text-gray-500 dark:text-[#a0a0a0] hidden sm:block font-medium">{profile?.business_name || user.email}</span>
-            <button onClick={() => supabase.auth.signOut().then(() => router.push("/"))}
-              className="text-sm text-gray-400 dark:text-[#a0a0a0] hover:text-red-600 dark:hover:text-red-400 font-medium transition-colors">
+            <button
+              onClick={() => supabase.auth.signOut().then(() => router.push("/"))}
+              className="text-sm text-gray-400 dark:text-[#a0a0a0] hover:text-red-600 dark:hover:text-red-400 font-medium transition-colors"
+            >
               Logout
             </button>
           </div>
@@ -178,14 +187,16 @@ export default function SellerDashboard() {
           <p className="text-gray-400 dark:text-[#a0a0a0] text-sm mt-0.5">Seller Dashboard</p>
         </div>
 
+        {/* Tab bar */}
         <div className="flex gap-2 mb-7 flex-wrap">
           <TabBtn active={tab === "overview"} onClick={() => setTab("overview")}>📊 Overview</TabBtn>
           <TabBtn active={tab === "products"} onClick={() => setTab("products")}>📦 Products ({products.length})</TabBtn>
-          <TabBtn active={tab === "orders"} onClick={() => setTab("orders")} badge={pendingOrders.length}>
+          <TabBtn active={tab === "orders"}   onClick={() => setTab("orders")}   badge={pendingOrders.length}>
             📋 Orders ({orders.length})
           </TabBtn>
         </div>
 
+        {/* ── Overview tab ── */}
         {tab === "overview" && (
           <div>
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
@@ -200,6 +211,8 @@ export default function SellerDashboard() {
                 </div>
               ))}
             </div>
+
+            {/* Recent orders preview */}
             <div className="mb-6">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="font-black text-gray-900 dark:text-white">Recent Orders</h2>
@@ -213,44 +226,81 @@ export default function SellerDashboard() {
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {orders.slice(0, 5).map((o) => <OrderCard key={o.id} order={o} />)}
+                  {orders.slice(0, 5).map((o) => (
+                    <OrderCard key={o.id} order={o} />
+                  ))}
                 </div>
               )}
             </div>
           </div>
         )}
 
+        {/* ── Products tab ── */}
         {tab === "products" && (
           <div>
             {!showForm && (
-              <button onClick={() => setShowForm(true)}
-                className="mb-6 bg-gray-900 text-white dark:bg-white dark:text-black px-5 py-2.5 rounded-xl font-bold hover:bg-gray-700 dark:hover:bg-gray-100 transition-colors">
+              <button
+                onClick={() => setShowForm(true)}
+                className="mb-6 bg-gray-900 text-white dark:bg-white dark:text-black px-5 py-2.5 rounded-xl font-bold hover:bg-gray-700 dark:hover:bg-gray-100 transition-colors"
+              >
                 + Add New Product
               </button>
             )}
+
             {showForm && (
               <div className="bg-white dark:bg-[#141414] rounded-2xl border border-gray-100 dark:border-[#2a2a2a] shadow-sm p-6 mb-6">
                 <h2 className="text-lg font-black text-gray-900 dark:text-white mb-5">{editing ? "Edit Product" : "Add New Product"}</h2>
-                {error && <div className="bg-red-50 dark:bg-red-950 border border-red-100 dark:border-red-900 text-red-700 dark:text-red-300 text-sm px-4 py-3 rounded-xl mb-4">{error}</div>}
+                {error && (
+                  <div className="bg-red-50 dark:bg-red-950 border border-red-100 dark:border-red-900 text-red-700 dark:text-red-300 text-sm px-4 py-3 rounded-xl mb-4">{error}</div>
+                )}
                 <form onSubmit={handleSave} className="space-y-4">
-                  <Field label="Product Title *" value={form.title} onChange={(v) => setForm({ ...form, title: v })} placeholder="e.g. Fresh Avocados (1kg)" />
+                  <Field label="Product Title *"  value={form.title}       onChange={(v) => setForm({ ...form, title: v })}       placeholder="e.g. Fresh Avocados (1kg)" />
                   <div>
                     <label className="block text-sm font-semibold text-gray-700 dark:text-[#a0a0a0] mb-1">Description</label>
-                    <textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} rows={3}
+                    <textarea
+                      value={form.description}
+                      onChange={(e) => setForm({ ...form, description: e.target.value })}
+                      rows={3}
                       placeholder="Describe your product…"
-                      className="w-full px-4 py-3 border border-gray-200 dark:border-[#2a2a2a] rounded-xl bg-white dark:bg-[#0a0a0a] text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-[#555] focus:outline-none focus:border-gray-900 dark:focus:border-white resize-none text-sm transition-colors" />
+                      className="w-full px-4 py-3 border border-gray-200 dark:border-[#2a2a2a] rounded-xl bg-white dark:bg-[#0a0a0a] text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-[#555] focus:outline-none focus:border-gray-900 dark:focus:border-white resize-none text-sm transition-colors"
+                    />
                   </div>
                   <Field label="Price (KSh) *" type="number" value={form.price} onChange={(v) => setForm({ ...form, price: v })} placeholder="500" />
                   <div>
+                    <label className="block text-sm font-semibold text-gray-700 dark:text-[#a0a0a0] mb-1">Category</label>
+                    <select
+                      value={form.category}
+                      onChange={(e) => setForm({ ...form, category: e.target.value })}
+                      className="w-full px-4 py-3 border border-gray-200 dark:border-[#2a2a2a] rounded-xl bg-white dark:bg-[#0a0a0a] text-gray-900 dark:text-white focus:outline-none focus:border-gray-900 dark:focus:border-white transition-colors text-sm"
+                    >
+                      {CATEGORIES.map((c) => (
+                        <option key={c} value={c}>{c}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
                     <label className="block text-sm font-semibold text-gray-700 dark:text-[#a0a0a0] mb-1">Product Image</label>
-                    <input type="file" accept="image/*" onChange={handleImageUpload}
-                      className="w-full text-sm text-gray-500 dark:text-[#a0a0a0] file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:bg-gray-100 dark:file:bg-[#1a1a1a] file:text-gray-700 dark:file:text-white file:font-semibold hover:file:bg-gray-200 dark:hover:file:bg-[#2a2a2a]" />
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleImageUpload}
+                      className="w-full text-sm text-gray-500 dark:text-[#a0a0a0] file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:bg-gray-100 dark:file:bg-[#1a1a1a] file:text-gray-700 dark:file:text-white file:font-semibold hover:file:bg-gray-200 dark:hover:file:bg-[#2a2a2a]"
+                    />
                     {uploading && <p className="text-xs text-gray-400 dark:text-[#a0a0a0] mt-1">Uploading…</p>}
-                    <input type="text" value={form.image_url} onChange={(e) => setForm({ ...form, image_url: e.target.value })}
+                    <input
+                      type="text"
+                      value={form.image_url}
+                      onChange={(e) => setForm({ ...form, image_url: e.target.value })}
                       placeholder="…or paste an image URL"
-                      className="w-full mt-2 px-4 py-2.5 border border-gray-200 dark:border-[#2a2a2a] rounded-xl bg-white dark:bg-[#0a0a0a] text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-[#555] text-sm focus:outline-none focus:border-gray-900 dark:focus:border-white transition-colors" />
+                      className="w-full mt-2 px-4 py-2.5 border border-gray-200 dark:border-[#2a2a2a] rounded-xl bg-white dark:bg-[#0a0a0a] text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-[#555] text-sm focus:outline-none focus:border-gray-900 dark:focus:border-white transition-colors"
+                    />
                     {form.image_url && (
-                      <img src={form.image_url} alt="Preview" className="mt-2 h-24 w-24 object-cover rounded-xl border border-gray-100 dark:border-[#2a2a2a]" onError={(e) => { e.target.style.display = "none"; }} />
+                      <img
+                        src={form.image_url}
+                        alt="Preview"
+                        className="mt-2 h-24 w-24 object-cover rounded-xl border border-gray-100 dark:border-[#2a2a2a]"
+                        onError={(e) => { e.target.style.display = "none"; }}
+                      />
                     )}
                   </div>
                   <div className="flex gap-3 pt-1">
@@ -266,6 +316,7 @@ export default function SellerDashboard() {
                 </form>
               </div>
             )}
+
             {products.length === 0 ? (
               <div className="bg-white dark:bg-[#141414] rounded-2xl border border-gray-100 dark:border-[#2a2a2a] text-center py-16 text-gray-400 dark:text-[#a0a0a0]">
                 <div className="text-5xl mb-3">📦</div>
@@ -293,6 +344,7 @@ export default function SellerDashboard() {
           </div>
         )}
 
+        {/* ── Orders tab ── */}
         {tab === "orders" && (
           <div>
             {orders.length === 0 ? (
@@ -337,15 +389,19 @@ function OrderCard({ order: o }) {
 
 function TabBtn({ active, onClick, children, badge }) {
   return (
-    <button onClick={onClick}
+    <button
+      onClick={onClick}
       className={`relative px-4 py-2 rounded-xl text-sm font-bold transition-all ${
         active
           ? "bg-gray-900 text-white dark:bg-white dark:text-black shadow-sm"
           : "bg-white dark:bg-[#141414] text-gray-600 dark:text-[#a0a0a0] hover:bg-gray-100 dark:hover:bg-[#1a1a1a] border border-gray-200 dark:border-[#2a2a2a]"
-      }`}>
+      }`}
+    >
       {children}
       {badge > 0 && (
-        <span className="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-xs rounded-full min-w-[20px] h-5 px-1 flex items-center justify-center">{badge}</span>
+        <span className="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-xs rounded-full min-w-[20px] h-5 px-1 flex items-center justify-center">
+          {badge}
+        </span>
       )}
     </button>
   );
@@ -355,8 +411,13 @@ function Field({ label, type = "text", value, onChange, placeholder }) {
   return (
     <div>
       <label className="block text-sm font-semibold text-gray-700 dark:text-[#a0a0a0] mb-1">{label}</label>
-      <input type={type} value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder}
-        className="w-full px-4 py-3 border border-gray-200 dark:border-[#2a2a2a] rounded-xl bg-white dark:bg-[#0a0a0a] text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-[#555] focus:outline-none focus:border-gray-900 dark:focus:border-white transition-colors" />
+      <input
+        type={type}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        className="w-full px-4 py-3 border border-gray-200 dark:border-[#2a2a2a] rounded-xl bg-white dark:bg-[#0a0a0a] text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-[#555] focus:outline-none focus:border-gray-900 dark:focus:border-white transition-colors"
+      />
     </div>
   );
 }

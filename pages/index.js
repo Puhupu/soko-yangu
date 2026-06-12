@@ -1,8 +1,12 @@
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
+import { useRouter } from "next/router";
 import { supabase, ksh, NO_IMAGE } from "../lib/supabase";
 import { useCart } from "../lib/CartContext";
 import { useTheme } from "../lib/ThemeContext";
+import { useAuth } from "../lib/AuthContext";
+
+const CATEGORIES = ["Groceries", "Produce", "Beverages", "Household", "Food & Snacks", "Services", "Other"];
 
 const AVATAR_COLORS = [
   ["bg-zinc-200 dark:bg-zinc-800",     "text-zinc-700 dark:text-zinc-200"],
@@ -13,7 +17,7 @@ const AVATAR_COLORS = [
   ["bg-sky-100 dark:bg-sky-950",       "text-sky-700 dark:text-sky-300"],
 ];
 
-// âââ Cart Drawer âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+// ─── Cart Drawer ───────────────────────────────────────────────────────────────
 function CartDrawer({ open, onClose, sellers }) {
   const { items, remove, updateQty, clear, total, count } = useCart();
   const [step, setStep]       = useState("items"); // items | form | success
@@ -54,9 +58,9 @@ function CartDrawer({ open, onClose, sellers }) {
       if (!sp?.phone) continue;
       const phone = "254" + String(sp.phone).replace(/\D/g, "").replace(/^0/, "");
       const sellerItems = items.filter((i) => i.seller_id === sid);
-      const list = sellerItems.map((i) => `â¢ ${i.title} Ã${i.qty} â ${ksh(i.price * i.qty)}`).join("\n");
+      const list = sellerItems.map((i) => `• ${i.title} ×${i.qty} — ${ksh(i.price * i.qty)}`).join("\n");
       const msg  = encodeURIComponent(
-        `ðï¸ New Order â Soko Yangu\n\n${list}\n\nBuyer: ${form.name.trim()}\nPhone: ${form.phone.trim()}\nLocation: ${form.location.trim()}\nTotal: ${ksh(sellerItems.reduce((s, i) => s + i.price * i.qty, 0))}`
+        `🛍️ New Order — Soko Yangu\n\n${list}\n\nBuyer: ${form.name.trim()}\nPhone: ${form.phone.trim()}\nLocation: ${form.location.trim()}\nTotal: ${ksh(sellerItems.reduce((s, i) => s + i.price * i.qty, 0))}`
       );
       links.push({ name: sp.business_name, url: `https://wa.me/${phone}?text=${msg}` });
     }
@@ -66,7 +70,7 @@ function CartDrawer({ open, onClose, sellers }) {
     setStep("success");
   }
 
-  const title = step === "success" ? "Order Placed! ð" : step === "form" ? "Your Details" : `Cart (${count})`;
+  const title = step === "success" ? "Order Placed! 🎉" : step === "form" ? "Your Details" : `Cart (${count})`;
 
   return (
     <>
@@ -78,7 +82,7 @@ function CartDrawer({ open, onClose, sellers }) {
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 dark:border-[#2a2a2a]">
           <h2 className="font-bold text-gray-900 dark:text-white text-lg">{title}</h2>
-          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 dark:hover:bg-[#1a1a1a] text-gray-400 dark:text-[#a0a0a0] hover:text-gray-600 dark:hover:text-white text-2xl leading-none transition-colors">Ã</button>
+          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 dark:hover:bg-[#1a1a1a] text-gray-400 dark:text-[#a0a0a0] hover:text-gray-600 dark:hover:text-white text-2xl leading-none transition-colors">×</button>
         </div>
 
         {/* Scrollable body */}
@@ -87,7 +91,7 @@ function CartDrawer({ open, onClose, sellers }) {
           {step === "items" && (
             items.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-full text-center text-gray-400 dark:text-[#a0a0a0] pb-16">
-                <div className="text-6xl mb-4">ð</div>
+                <div className="text-6xl mb-4">🛒</div>
                 <p className="font-semibold">Your cart is empty</p>
                 <p className="text-sm mt-1">Browse products and tap + Cart</p>
               </div>
@@ -105,12 +109,12 @@ function CartDrawer({ open, onClose, sellers }) {
                       <p className="font-semibold text-gray-900 dark:text-white text-sm line-clamp-2 leading-snug">{item.title}</p>
                       <p className="text-gray-900 dark:text-white font-bold text-sm mt-1">{ksh(item.price)}</p>
                       <div className="flex items-center gap-2 mt-2">
-                        <button onClick={() => updateQty(item.id, item.qty - 1)} className="w-7 h-7 rounded-lg bg-white dark:bg-[#1a1a1a] border border-gray-200 dark:border-[#2a2a2a] text-gray-600 dark:text-[#a0a0a0] font-bold flex items-center justify-center hover:bg-gray-100 dark:hover:bg-[#2a2a2a] transition-colors">â</button>
+                        <button onClick={() => updateQty(item.id, item.qty - 1)} className="w-7 h-7 rounded-lg bg-white dark:bg-[#1a1a1a] border border-gray-200 dark:border-[#2a2a2a] text-gray-600 dark:text-[#a0a0a0] font-bold flex items-center justify-center hover:bg-gray-100 dark:hover:bg-[#2a2a2a] transition-colors">−</button>
                         <span className="text-sm font-semibold text-gray-900 dark:text-white w-5 text-center">{item.qty}</span>
                         <button onClick={() => updateQty(item.id, item.qty + 1)} className="w-7 h-7 rounded-lg bg-white dark:bg-[#1a1a1a] border border-gray-200 dark:border-[#2a2a2a] text-gray-600 dark:text-[#a0a0a0] font-bold flex items-center justify-center hover:bg-gray-100 dark:hover:bg-[#2a2a2a] transition-colors">+</button>
                       </div>
                     </div>
-                    <button onClick={() => remove(item.id)} className="text-gray-300 dark:text-[#555] hover:text-red-400 text-xl leading-none mt-1 flex-shrink-0 transition-colors">Ã</button>
+                    <button onClick={() => remove(item.id)} className="text-gray-300 dark:text-[#555] hover:text-red-400 text-xl leading-none mt-1 flex-shrink-0 transition-colors">×</button>
                   </div>
                 ))}
               </div>
@@ -120,7 +124,7 @@ function CartDrawer({ open, onClose, sellers }) {
           {step === "form" && (
             <form id="cart-checkout" onSubmit={handleCheckout} className="space-y-4">
               <div className="bg-gray-50 dark:bg-[#141414] rounded-2xl p-4 mb-2 border border-gray-100 dark:border-[#2a2a2a]">
-                <p className="text-sm font-semibold text-gray-900 dark:text-white">{count} item{count !== 1 ? "s" : ""} Â· {ksh(total)}</p>
+                <p className="text-sm font-semibold text-gray-900 dark:text-white">{count} item{count !== 1 ? "s" : ""} · {ksh(total)}</p>
                 <p className="text-xs text-gray-500 dark:text-[#a0a0a0] mt-0.5">Pay cash on delivery</p>
               </div>
               {[
@@ -145,7 +149,7 @@ function CartDrawer({ open, onClose, sellers }) {
 
           {step === "success" && (
             <div className="flex flex-col items-center text-center py-6">
-              <div className="text-6xl mb-4">ð</div>
+              <div className="text-6xl mb-4">🎉</div>
               <h3 className="text-xl font-bold text-gray-900 dark:text-white">Orders placed!</h3>
               <p className="text-gray-500 dark:text-[#a0a0a0] text-sm mt-2 max-w-xs">
                 Sellers will contact you at <strong className="text-gray-900 dark:text-white">{form.phone}</strong> to arrange delivery.
@@ -156,7 +160,7 @@ function CartDrawer({ open, onClose, sellers }) {
                   {vendorLinks.map((l, i) => (
                     <a key={i} href={l.url} target="_blank" rel="noopener noreferrer"
                       className="flex items-center gap-3 bg-gray-100 dark:bg-[#141414] border border-gray-200 dark:border-[#2a2a2a] text-gray-900 dark:text-white px-4 py-3 rounded-xl text-sm font-bold hover:bg-gray-200 dark:hover:bg-[#1a1a1a] transition-colors w-full">
-                      <span className="text-lg">ð²</span>
+                      <span className="text-lg">📲</span>
                       <span>WhatsApp {l.name}</span>
                     </a>
                   ))}
@@ -164,7 +168,7 @@ function CartDrawer({ open, onClose, sellers }) {
                 </div>
               )}
               <button onClick={onClose} className="mt-8 text-gray-500 dark:text-[#a0a0a0] font-bold text-sm hover:underline">
-                â Continue Shopping
+                ← Continue Shopping
               </button>
             </div>
           )}
@@ -178,7 +182,7 @@ function CartDrawer({ open, onClose, sellers }) {
               <span className="font-black text-lg text-gray-900 dark:text-white">{ksh(total)}</span>
             </div>
             <button onClick={() => setStep("form")} className="w-full bg-gray-900 text-white py-3.5 rounded-2xl font-bold text-base hover:bg-gray-700 dark:bg-white dark:text-black dark:hover:bg-gray-100 transition-colors">
-              Checkout â
+              Checkout →
             </button>
           </div>
         )}
@@ -186,10 +190,10 @@ function CartDrawer({ open, onClose, sellers }) {
           <div className="px-5 py-4 border-t border-gray-100 dark:border-[#2a2a2a] space-y-2">
             <button form="cart-checkout" type="submit" disabled={busy}
               className="w-full bg-gray-900 text-white py-3.5 rounded-2xl font-bold text-base hover:bg-gray-700 dark:bg-white dark:text-black dark:hover:bg-gray-100 disabled:opacity-50 transition-colors">
-              {busy ? "Placing ordersâ¦" : `Confirm Â· ${ksh(total)}`}
+              {busy ? "Placing orders…" : `Confirm · ${ksh(total)}`}
             </button>
             <button onClick={() => setStep("items")} className="w-full text-sm text-gray-400 dark:text-[#a0a0a0] hover:text-gray-600 dark:hover:text-white py-1 transition-colors">
-              â Back to cart
+              ← Back to cart
             </button>
           </div>
         )}
@@ -198,17 +202,21 @@ function CartDrawer({ open, onClose, sellers }) {
   );
 }
 
-// âââ Homepage âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+// ─── Homepage ─────────────────────────────────────────────────────────────────
 export default function Home() {
-  const { add, count }        = useCart();
-  const { dark, toggle }      = useTheme();
+  const router                  = useRouter();
+  const { add, count }          = useCart();
+  const { dark, toggle }        = useTheme();
+  const { user, signOut }       = useAuth();
   const [products, setProducts] = useState([]);
   const [sellers,  setSellers]  = useState([]);
   const [loading,  setLoading]  = useState(true);
   const [search,   setSearch]   = useState("");
-  const [selectedShop, setSelectedShop] = useState(null);
-  const [cartOpen, setCartOpen] = useState(false);
-  const [flashId,  setFlashId]  = useState(null);
+  const [selectedShop,   setSelectedShop]   = useState(null);
+  const [categoryFilter, setCategoryFilter] = useState("All");
+  const [cartOpen,    setCartOpen]    = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [flashId,     setFlashId]     = useState(null);
   const productsRef = useRef(null);
 
   useEffect(() => {
@@ -229,7 +237,8 @@ export default function Home() {
       p.title.toLowerCase().includes(q) ||
       (p.description || "").toLowerCase().includes(q) ||
       (p.seller_name  || "").toLowerCase().includes(q);
-    return matchesShop && matchesSearch;
+    const matchesCat    = categoryFilter === "All" || (p.category || "Other") === categoryFilter;
+    return matchesShop && matchesSearch && matchesCat;
   });
 
   // Debounced search logging
@@ -272,20 +281,34 @@ export default function Home() {
 
       {/* Nav */}
       <nav className="bg-white dark:bg-[#0a0a0a] border-b border-gray-200 dark:border-[#2a2a2a] sticky top-0 z-30 transition-colors duration-200">
-        <div className="max-w-6xl mx-auto px-4 h-14 flex items-center justify-between gap-4">
-          <Link href="/" className="text-xl font-black text-gray-900 dark:text-white tracking-tight flex-shrink-0">
-            Soko Yangu
-          </Link>
+        <div className="max-w-full px-4 h-14 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2 flex-shrink-0">
+            {/* Hamburger — mobile only */}
+            <button
+              onClick={() => setSidebarOpen(true)}
+              className="lg:hidden w-9 h-9 flex flex-col items-center justify-center gap-[5px] rounded-full hover:bg-gray-100 dark:hover:bg-[#1a1a1a] transition-colors"
+              aria-label="Open menu"
+            >
+              <span className="w-5 h-0.5 bg-gray-600 dark:bg-[#a0a0a0] rounded-full" />
+              <span className="w-5 h-0.5 bg-gray-600 dark:bg-[#a0a0a0] rounded-full" />
+              <span className="w-3 h-0.5 bg-gray-600 dark:bg-[#a0a0a0] rounded-full self-start ml-[2px]" />
+            </button>
+            <Link href="/" className="text-xl font-black text-gray-900 dark:text-white tracking-tight">
+              Soko Yangu
+            </Link>
+          </div>
+
           {/* Desktop search */}
           <div className="hidden sm:flex flex-1 max-w-sm">
             <input
               type="text"
-              placeholder="Search productsâ¦"
+              placeholder="Search products…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="w-full px-4 py-2 border border-gray-200 dark:border-[#2a2a2a] rounded-full text-sm bg-gray-50 dark:bg-[#141414] text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-[#555] focus:outline-none focus:border-gray-900 dark:focus:border-white transition-colors"
             />
           </div>
+
           <div className="flex items-center gap-2">
             {/* Theme toggle */}
             <button
@@ -293,16 +316,33 @@ export default function Home() {
               className="w-9 h-9 flex items-center justify-center rounded-full text-gray-400 dark:text-[#a0a0a0] hover:bg-gray-100 dark:hover:bg-[#1a1a1a] transition-colors text-base"
               title={dark ? "Switch to light mode" : "Switch to dark mode"}
             >
-              {dark ? "â" : "â½"}
+              {dark ? "☀" : "☽"}
             </button>
+
+            {/* Buyer auth — desktop */}
+            {user ? (
+              <button
+                onClick={() => signOut()}
+                className="hidden sm:flex items-center gap-1.5 text-sm font-medium px-3 py-1.5 rounded-xl text-gray-500 dark:text-[#a0a0a0] hover:bg-gray-100 dark:hover:bg-[#1a1a1a] hover:text-gray-900 dark:hover:text-white transition-colors"
+                title={user.email}
+              >
+                👤 Sign Out
+              </button>
+            ) : (
+              <Link href="/buyer/login" className="hidden sm:flex items-center gap-1.5 text-sm font-medium px-3 py-1.5 rounded-xl text-gray-500 dark:text-[#a0a0a0] hover:bg-gray-100 dark:hover:bg-[#1a1a1a] hover:text-gray-900 dark:hover:text-white transition-colors">
+                👤 Sign In
+              </Link>
+            )}
+
             <Link href="/seller/login" className="hidden sm:flex items-center gap-1.5 text-sm font-bold px-3 py-1.5 rounded-xl bg-gray-100 dark:bg-[#1a1a1a] text-gray-700 dark:text-[#a0a0a0] hover:bg-gray-200 dark:hover:bg-[#2a2a2a] hover:text-gray-900 dark:hover:text-white transition-colors">
-              ðª Seller Login
+              🏪 Seller
             </Link>
+
             <button
               onClick={() => setCartOpen(true)}
               className="relative w-10 h-10 flex items-center justify-center rounded-full hover:bg-gray-100 dark:hover:bg-[#1a1a1a] transition-colors"
             >
-              <span className="text-xl">ð</span>
+              <span className="text-xl">🛒</span>
               {count > 0 && (
                 <span className="absolute -top-0.5 -right-0.5 bg-gray-900 dark:bg-white text-white dark:text-black text-xs font-bold rounded-full min-w-[18px] h-[18px] px-1 flex items-center justify-center leading-none">
                   {count}
@@ -313,19 +353,53 @@ export default function Home() {
         </div>
       </nav>
 
-      {/* Mobile search bar */}
-      <div className="sm:hidden px-4 py-3 border-b border-gray-100 dark:border-[#2a2a2a] bg-white dark:bg-[#0a0a0a]">
-        <input
-          type="text"
-          placeholder="Search productsâ¦"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="w-full px-4 py-2.5 border border-gray-200 dark:border-[#2a2a2a] rounded-full text-sm bg-gray-50 dark:bg-[#141414] text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-[#555] focus:outline-none focus:border-gray-900 dark:focus:border-white transition-colors"
+      {/* Mobile sidebar overlay */}
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 z-40 lg:hidden"
+          onClick={() => setSidebarOpen(false)}
         />
-      </div>
+      )}
+      <aside
+        className={`fixed top-0 left-0 h-full w-64 bg-white dark:bg-[#0a0a0a] z-50 lg:hidden shadow-2xl border-r border-gray-100 dark:border-[#2a2a2a] flex flex-col transition-transform duration-300 ${
+          sidebarOpen ? "translate-x-0" : "-translate-x-full"
+        }`}
+      >
+        <SidebarContent
+          categoryFilter={categoryFilter}
+          setCategoryFilter={(c) => { setCategoryFilter(c); setSidebarOpen(false); }}
+          onClose={() => setSidebarOpen(false)}
+          user={user}
+          signOut={() => { signOut(); setSidebarOpen(false); }}
+        />
+      </aside>
+
+      {/* Desktop fixed sidebar */}
+      <aside className="hidden lg:flex flex-col fixed top-14 left-0 bottom-0 w-56 bg-white dark:bg-[#0a0a0a] border-r border-gray-100 dark:border-[#2a2a2a] overflow-y-auto z-20">
+        <SidebarContent
+          categoryFilter={categoryFilter}
+          setCategoryFilter={setCategoryFilter}
+          user={user}
+          signOut={signOut}
+        />
+      </aside>
+
+      {/* Page body — offset on desktop for sidebar */}
+      <div className="lg:pl-56">
+
+        {/* Mobile search bar */}
+        <div className="sm:hidden px-4 py-3 border-b border-gray-100 dark:border-[#2a2a2a] bg-white dark:bg-[#0a0a0a]">
+          <input
+            type="text"
+            placeholder="Search products…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full px-4 py-2.5 border border-gray-200 dark:border-[#2a2a2a] rounded-full text-sm bg-gray-50 dark:bg-[#141414] text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-[#555] focus:outline-none focus:border-gray-900 dark:focus:border-white transition-colors"
+          />
+        </div>
 
       {/* Main content */}
-      <div className="max-w-6xl mx-auto px-4 py-8" ref={productsRef}>
+      <div className="max-w-5xl mx-auto px-4 py-8" ref={productsRef}>
 
         {/* Shop filter pills */}
         {shops.length > 0 && (
@@ -356,6 +430,33 @@ export default function Home() {
           </div>
         )}
 
+        {/* Category filter pills */}
+        <div className="flex gap-2 mb-4 overflow-x-auto pb-1 -mx-1 px-1">
+          <button
+            onClick={() => setCategoryFilter("All")}
+            className={`flex-shrink-0 px-3 py-1 rounded-full text-xs font-bold border transition-all ${
+              categoryFilter === "All"
+                ? "bg-gray-900 text-white border-gray-900 dark:bg-white dark:text-black dark:border-white"
+                : "bg-white dark:bg-[#141414] text-gray-600 dark:text-[#a0a0a0] border-gray-200 dark:border-[#2a2a2a] hover:border-gray-400 dark:hover:border-[#555]"
+            }`}
+          >
+            All
+          </button>
+          {CATEGORIES.map((cat) => (
+            <button
+              key={cat}
+              onClick={() => setCategoryFilter(cat)}
+              className={`flex-shrink-0 px-3 py-1 rounded-full text-xs font-bold border transition-all ${
+                categoryFilter === cat
+                  ? "bg-gray-900 text-white border-gray-900 dark:bg-white dark:text-black dark:border-white"
+                  : "bg-white dark:bg-[#141414] text-gray-600 dark:text-[#a0a0a0] border-gray-200 dark:border-[#2a2a2a] hover:border-gray-400 dark:hover:border-[#555]"
+              }`}
+            >
+              {cat}
+            </button>
+          ))}
+        </div>
+
         {/* Section heading + cart CTA */}
         <div className="flex items-center justify-between mb-5">
           <div>
@@ -374,7 +475,7 @@ export default function Home() {
               onClick={() => setCartOpen(true)}
               className="flex items-center gap-2 bg-gray-900 text-white text-sm font-bold px-4 py-2.5 rounded-xl hover:bg-gray-700 dark:bg-white dark:text-black dark:hover:bg-gray-100 transition-colors shadow-sm"
             >
-              ð Cart ({count})
+              🛒 Cart ({count})
             </button>
           )}
         </div>
@@ -398,7 +499,7 @@ export default function Home() {
           </div>
         ) : filtered.length === 0 ? (
           <div className="text-center py-24 text-gray-400 dark:text-[#a0a0a0]">
-            <div className="text-6xl mb-4">ð</div>
+            <div className="text-6xl mb-4">🔍</div>
             <p className="font-semibold text-lg">{search ? `No results for "${search}"` : "No products yet"}</p>
             {search && <p className="text-sm mt-1">Try a different search term</p>}
           </div>
@@ -433,7 +534,7 @@ export default function Home() {
                             : "border-gray-300 dark:border-[#2a2a2a] text-gray-700 dark:text-[#a0a0a0] hover:bg-gray-100 dark:hover:bg-[#1a1a1a]"
                         }`}
                       >
-                        {isFlash ? "Added â" : "+ Cart"}
+                        {isFlash ? "Added ✓" : "+ Cart"}
                       </button>
                       <Link
                         href={`/product/${p.id}`}
@@ -479,7 +580,7 @@ export default function Home() {
                         <p className="text-sm text-gray-500 dark:text-[#a0a0a0] mt-0.5">{s.productCount} product{s.productCount !== 1 ? "s" : ""}</p>
                       </div>
                       <span className={`text-sm font-bold flex-shrink-0 ${isActive ? "text-gray-900 dark:text-white" : "text-gray-300 dark:text-[#555]"}`}>
-                        {isActive ? "Viewing â" : "â"}
+                        {isActive ? "Viewing ✓" : "→"}
                       </span>
                     </div>
                   </button>
@@ -492,8 +593,103 @@ export default function Home() {
 
       <footer className="border-t border-gray-100 dark:border-[#2a2a2a] text-center text-xs text-gray-400 dark:text-[#a0a0a0] py-10 mt-10">
         <p className="font-bold text-gray-500 dark:text-[#a0a0a0] mb-1">Soko Yangu</p>
-        <p>Kenya&apos;s simple marketplace Â· Cash on Delivery</p>
+        <p>Kenya&apos;s simple marketplace · Cash on Delivery</p>
       </footer>
+
+      </div> {/* end lg:pl-56 */}
     </div>
+  );
+}
+
+// ─── Sidebar Content ──────────────────────────────────────────────────────────
+function SidebarContent({ categoryFilter, setCategoryFilter, onClose, user, signOut }) {
+  return (
+    <div className="flex flex-col h-full">
+      {/* Header */}
+      <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 dark:border-[#2a2a2a]">
+        <Link href="/" className="text-lg font-black text-gray-900 dark:text-white tracking-tight">
+          Soko Yangu
+        </Link>
+        {onClose && (
+          <button
+            onClick={onClose}
+            className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 dark:hover:bg-[#1a1a1a] text-gray-400 text-xl transition-colors"
+          >
+            ×
+          </button>
+        )}
+      </div>
+
+      {/* Nav links */}
+      <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
+        <SideLink href="/" icon="🏠" label="Home" onClick={onClose} />
+        <SideLink href="/seller/login" icon="🏪" label="Seller Portal" onClick={onClose} />
+        <SideLink href="/seller/dashboard" icon="📋" label="Orders" onClick={onClose} />
+
+        {/* Category filters */}
+        <div className="pt-4 pb-1">
+          <p className="text-[10px] font-bold text-gray-400 dark:text-[#555] uppercase tracking-widest px-3 mb-2">Categories</p>
+          <button
+            onClick={() => setCategoryFilter("All")}
+            className={`w-full text-left px-3 py-2 rounded-xl text-sm font-semibold transition-colors ${
+              categoryFilter === "All"
+                ? "bg-gray-900 text-white dark:bg-white dark:text-black"
+                : "text-gray-600 dark:text-[#a0a0a0] hover:bg-gray-100 dark:hover:bg-[#1a1a1a]"
+            }`}
+          >
+            All Products
+          </button>
+          {CATEGORIES.map((cat) => (
+            <button
+              key={cat}
+              onClick={() => setCategoryFilter(cat)}
+              className={`w-full text-left px-3 py-2 rounded-xl text-sm font-semibold transition-colors ${
+                categoryFilter === cat
+                  ? "bg-gray-900 text-white dark:bg-white dark:text-black"
+                  : "text-gray-600 dark:text-[#a0a0a0] hover:bg-gray-100 dark:hover:bg-[#1a1a1a]"
+              }`}
+            >
+              {cat}
+            </button>
+          ))}
+        </div>
+      </nav>
+
+      {/* User section */}
+      <div className="border-t border-gray-100 dark:border-[#2a2a2a] px-3 py-4">
+        {user ? (
+          <div className="space-y-1">
+            <p className="text-xs text-gray-400 dark:text-[#555] px-3 truncate">{user.email}</p>
+            <button
+              onClick={signOut}
+              className="w-full text-left px-3 py-2 rounded-xl text-sm font-semibold text-gray-600 dark:text-[#a0a0a0] hover:bg-gray-100 dark:hover:bg-[#1a1a1a] transition-colors"
+            >
+              Sign Out
+            </button>
+          </div>
+        ) : (
+          <Link
+            href="/buyer/login"
+            onClick={onClose}
+            className="block px-3 py-2 rounded-xl text-sm font-semibold text-gray-600 dark:text-[#a0a0a0] hover:bg-gray-100 dark:hover:bg-[#1a1a1a] transition-colors"
+          >
+            👤 Sign In
+          </Link>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function SideLink({ href, icon, label, onClick }) {
+  return (
+    <Link
+      href={href}
+      onClick={onClick}
+      className="flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-semibold text-gray-600 dark:text-[#a0a0a0] hover:bg-gray-100 dark:hover:bg-[#1a1a1a] hover:text-gray-900 dark:hover:text-white transition-colors"
+    >
+      <span>{icon}</span>
+      <span>{label}</span>
+    </Link>
   );
 }
