@@ -43,6 +43,7 @@ function CartDrawer({ open, onClose, sellers }) {
       product_title:     item.title,
       product_price:     item.price,
       seller_id:         item.seller_id,
+      quantity:          item.qty,
       buyer_name:        form.name.trim(),
       buyer_phone:       form.phone.trim(),
       delivery_location: form.location.trim(),
@@ -224,7 +225,7 @@ export default function Home() {
       supabase.from("products").select("*").order("created_at", { ascending: false }),
       supabase.from("seller_profiles").select("*").order("business_name"),
     ]).then(([{ data: prods }, { data: sels }]) => {
-      setProducts(prods || []);
+      setProducts((prods || []).filter((p) => p.is_active !== false));
       setSellers(sels  || []);
       setLoading(false);
     });
@@ -280,7 +281,7 @@ export default function Home() {
       <CartDrawer open={cartOpen} onClose={() => setCartOpen(false)} sellers={sellers} />
 
       {/* Nav */}
-      <nav className="bg-white dark:bg-[#0a0a0a] border-b border-gray-200 dark:border-[#2a2a2a] sticky top-0 z-30 transition-colors duration-200">
+      <nav className="bg-white/80 dark:bg-[#0a0a0a]/80 backdrop-blur-xl border-b border-gray-200/70 dark:border-[#1f1f1f] sticky top-0 z-30 transition-colors duration-200">
         <div className="max-w-full px-4 h-14 flex items-center justify-between gap-3">
           <div className="flex items-center gap-2 flex-shrink-0">
             {/* Hamburger — mobile only */}
@@ -293,8 +294,9 @@ export default function Home() {
               <span className="w-5 h-0.5 bg-gray-600 dark:bg-[#a0a0a0] rounded-full" />
               <span className="w-3 h-0.5 bg-gray-600 dark:bg-[#a0a0a0] rounded-full self-start ml-[2px]" />
             </button>
-            <Link href="/" className="text-xl font-black text-gray-900 dark:text-white tracking-tight">
-              Soko Yangu
+            <Link href="/" className="flex items-center gap-2 group">
+              <span className="sk-mark w-8 h-8 rounded-xl flex items-center justify-center text-white font-black text-lg font-display">S</span>
+              <span className="text-xl font-black tracking-tight font-display sk-brand">Soko Yangu</span>
             </Link>
           </div>
 
@@ -504,11 +506,11 @@ export default function Home() {
             {search && <p className="text-sm mt-1">Try a different search term</p>}
           </div>
         ) : (
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sk-fade-up">
             {filtered.map((p) => {
               const isFlash = flashId === p.id;
               return (
-                <div key={p.id} className="bg-white dark:bg-[#141414] rounded-2xl border border-gray-100 dark:border-[#2a2a2a] overflow-hidden hover:shadow-xl hover:-translate-y-0.5 transition-all duration-200 flex flex-col group">
+                <div key={p.id} className="bg-white dark:bg-[#141414] rounded-3xl border border-gray-100 dark:border-[#1f1f1f] overflow-hidden sk-shadow hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 flex flex-col group">
                   <Link href={`/product/${p.id}`} className="block aspect-square overflow-hidden bg-gray-50 dark:bg-[#1a1a1a]">
                     <img
                       src={p.image_url || NO_IMAGE}
@@ -624,7 +626,7 @@ function SidebarContent({ categoryFilter, setCategoryFilter, onClose, user, sign
       <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
         <SideLink href="/" icon="🏠" label="Home" onClick={onClose} />
         <SideLink href="/seller/login" icon="🏪" label="Seller Portal" onClick={onClose} />
-        <SideLink href="/seller/dashboard" icon="📋" label="Orders" onClick={onClose} />
+        <SideLink href="/orders" icon="📦" label="My Orders" onClick={onClose} />
 
         {/* Category filters */}
         <div className="pt-4 pb-1">
