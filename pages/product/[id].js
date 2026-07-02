@@ -12,6 +12,7 @@ export default function ProductPage() {
   const { dark, toggle } = useTheme();
   const [product,    setProduct]    = useState(null);
   const [loading,    setLoading]    = useState(true);
+  const [qty,        setQty]        = useState(1);
   const [form,       setForm]       = useState({ name: "", phone: "", location: "" });
   const [submitting, setSubmitting] = useState(false);
   const [error,      setError]      = useState("");
@@ -40,6 +41,7 @@ export default function ProductPage() {
         product_title:     product.title,
         product_price:     product.price,
         seller_id:         product.seller_id,
+        quantity:          qty,
         buyer_name:        form.name.trim(),
         buyer_phone:       form.phone.trim(),
         delivery_location: form.location.trim(),
@@ -54,29 +56,14 @@ export default function ProductPage() {
       return;
     }
 
-    // Fetch seller profile to build vendor WA link
-    const { data: sp } = await supabase
-      .from("seller_profiles")
-      .select("phone, business_name")
-      .eq("id", product.seller_id)
-      .single();
-
-    if (sp?.phone) {
-      const phone = "254" + String(sp.phone).replace(/\D/g, "").replace(/^0/, "");
-      const msg   = encodeURIComponent(
-        `🛍️ New Order — Soko Yangu\n\nProduct: ${product.title}\nPrice: ${ksh(product.price)}\n\nBuyer: ${form.name.trim()}\nPhone: ${form.phone.trim()}\nLocation: ${form.location.trim()}`
-      );
-      // Auto-open WhatsApp to notify vendor
-      window.open(`https://wa.me/${phone}?text=${msg}`, "_blank");
-    }
-
     setSubmitting(false);
-    // Redirect to dedicated order confirmation page
+    // Redirect to the confirmation page, which offers a reliable
+    // "Notify seller on WhatsApp" button (auto-popups get blocked by browsers).
     router.push(`/order/confirm?id=${inserted.id}`);
   }
 
   function handleAddToCart() {
-    add(product);
+    add(product, qty);
     setCartFlash(true);
     setTimeout(() => setCartFlash(false), 1400);
   }
@@ -173,6 +160,27 @@ export default function ProductPage() {
             <div className="bg-red-50 dark:bg-red-950 border border-red-100 dark:border-red-900 text-red-700 dark:text-red-300 text-sm px-4 py-3 rounded-xl mb-4">{error}</div>
           )}
           <form onSubmit={handleOrder} className="space-y-4">
+            {/* Quantity selector */}
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 dark:text-[#a0a0a0] mb-1">Quantity</label>
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => setQty((q) => Math.max(1, q - 1))}
+                  className="w-10 h-10 rounded-xl bg-gray-100 dark:bg-[#1a1a1a] border border-gray-200 dark:border-[#2a2a2a] text-gray-700 dark:text-[#a0a0a0] font-bold text-lg flex items-center justify-center hover:bg-gray-200 dark:hover:bg-[#2a2a2a] transition-colors"
+                >
+                  −
+                </button>
+                <span className="text-lg font-black text-gray-900 dark:text-white w-8 text-center">{qty}</span>
+                <button
+                  type="button"
+                  onClick={() => setQty((q) => Math.min(99, q + 1))}
+                  className="w-10 h-10 rounded-xl bg-gray-100 dark:bg-[#1a1a1a] border border-gray-200 dark:border-[#2a2a2a] text-gray-700 dark:text-[#a0a0a0] font-bold text-lg flex items-center justify-center hover:bg-gray-200 dark:hover:bg-[#2a2a2a] transition-colors"
+                >
+                  +
+                </button>
+              </div>
+            </div>
             <Field label="Your Name"         value={form.name}     onChange={(v) => setForm({ ...form, name: v })}     placeholder="e.g. John Kamau" />
             <Field label="Phone / WhatsApp"  value={form.phone}    onChange={(v) => setForm({ ...form, phone: v })}    placeholder="07xx xxx xxx" type="tel" />
             <Field label="Delivery Location" value={form.location} onChange={(v) => setForm({ ...form, location: v })} placeholder="e.g. Syokimau, Phase 3" />
@@ -181,7 +189,7 @@ export default function ProductPage() {
               disabled={submitting}
               className="w-full bg-gray-900 text-white dark:bg-white dark:text-black py-3.5 rounded-2xl font-black text-base hover:bg-gray-700 dark:hover:bg-gray-100 disabled:opacity-50 transition-colors mt-2"
             >
-              {submitting ? "Placing order…" : `Order Now · ${ksh(product.price)}`}
+              {submitting ? "Placing order…" : `Order Now · ${ksh(product.price * qty)}`}
             </button>
           </form>
         </div>
