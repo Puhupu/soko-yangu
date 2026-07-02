@@ -38,7 +38,10 @@ export default function SellerLogin() {
           {loading ? "Signing in…" : "Sign In"}
         </button>
       </form>
-      <p className="text-sm text-gray-500 dark:text-[#a0a0a0] text-center mt-5">
+      <p className="text-center mt-4">
+        <Link href="/reset-password" className="text-sm text-gray-500 dark:text-[#a0a0a0] hover:underline">Forgot password?</Link>
+      </p>
+      <p className="text-sm text-gray-500 dark:text-[#a0a0a0] text-center mt-3">
         No account?{" "}
         <Link href="/seller/signup" className="text-gray-900 dark:text-white font-semibold hover:underline">Create one →</Link>
       </p>

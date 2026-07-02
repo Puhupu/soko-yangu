@@ -48,7 +48,7 @@ export default function BuyerLogin() {
       </button>
       <p className="text-center mt-4">
         <Link href="/" className="text-xs text-gray-400 dark:text-[#555] hover:text-gray-600 dark:hover:text-[#a0a0a0] transition-colors">
-          â Back to shop
+          ← Back to shop
         </Link>
       </p>
     </AuthShell>
@@ -59,7 +59,7 @@ export default function BuyerLogin() {
       title={mode === "login" ? "Sign In" : "Create Account"}
       subtitle={
         mode === "login"
-          ? "Optional â sign in to pre-fill your checkout details."
+          ? "Optional — sign in to pre-fill your checkout details."
           : "Create a free buyer account."
       }
     >
@@ -76,19 +76,24 @@ export default function BuyerLogin() {
           disabled={loading}
           className="w-full bg-gray-900 text-white dark:bg-white dark:text-black py-3 rounded-xl font-bold hover:bg-gray-700 dark:hover:bg-gray-100 disabled:opacity-50 transition-colors"
         >
-          {loading ? "Please waitâ¦" : mode === "login" ? "Sign In" : "Create Account"}
+          {loading ? "Please wait…" : mode === "login" ? "Sign In" : "Create Account"}
         </button>
       </form>
+      {mode === "login" && (
+        <p className="text-center mt-4">
+          <Link href="/reset-password" className="text-sm text-gray-500 dark:text-[#a0a0a0] hover:underline">Forgot password?</Link>
+        </p>
+      )}
       <p className="text-sm text-gray-500 dark:text-[#a0a0a0] text-center mt-5">
         {mode === "login" ? (
-          <>No account?{" "}<button onClick={() => setMode("signup")} className="text-gray-900 dark:text-white font-semibold hover:underline">Create one â</button></>
+          <>No account?{" "}<button onClick={() => setMode("signup")} className="text-gray-900 dark:text-white font-semibold hover:underline">Create one →</button></>
         ) : (
-          <>Already have one?{" "}<button onClick={() => setMode("login")} className="text-gray-900 dark:text-white font-semibold hover:underline">Sign in â</button></>
+          <>Already have one?{" "}<button onClick={() => setMode("login")} className="text-gray-900 dark:text-white font-semibold hover:underline">Sign in →</button></>
         )}
       </p>
       <p className="text-center mt-3">
         <Link href="/" className="text-xs text-gray-400 dark:text-[#555] hover:text-gray-600 dark:hover:text-[#a0a0a0] transition-colors">
-          â Continue without signing in
+          ← Continue without signing in
         </Link>
       </p>
     </AuthShell>
