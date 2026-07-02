@@ -2,4 +2,62 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ─── Premium typography & feel ─────────────────────────────── */
+html { scroll-behavior: smooth; }
 html, body { -webkit-tap-highlight-color: transparent; }
+
+body {
+  font-family: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11", "ss01";
+}
+
+/* Display font for headings and the brand mark */
+h1, h2, h3, .font-display {
+  font-family: "Plus Jakarta Sans", "Inter", ui-sans-serif, system-ui, sans-serif;
+  letter-spacing: -0.022em;
+}
+
+/* Subtle warmth on the dark canvas (behind the app's own backgrounds) */
+.dark body { background-color: #08090c; }
+
+/* Brand accent (emerald) as a reusable gradient text */
+.sk-brand {
+  background: linear-gradient(135deg, #34d399 0%, #10b981 45%, #059669 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* Brand logo mark */
+.sk-mark {
+  background: linear-gradient(135deg, #34d399 0%, #059669 100%);
+  box-shadow: 0 6px 16px -6px rgba(16, 185, 129, 0.6);
+}
+
+/* Premium elevation for cards */
+.sk-shadow { box-shadow: 0 1px 2px rgba(0,0,0,0.04), 0 10px 30px -12px rgba(0,0,0,0.18); }
+.dark .sk-shadow { box-shadow: 0 1px 2px rgba(0,0,0,0.4), 0 12px 34px -14px rgba(0,0,0,0.7); }
+
+/* Refined text selection */
+::selection { background: rgba(16, 185, 129, 0.28); }
+
+/* Slim, refined scrollbars */
+* { scrollbar-width: thin; scrollbar-color: rgba(140,140,140,0.35) transparent; }
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb {
+  background: rgba(140,140,140,0.32);
+  border-radius: 9999px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+::-webkit-scrollbar-thumb:hover { background: rgba(140,140,140,0.55); background-clip: content-box; }
+
+/* Gentle entrance animation */
+@keyframes sk-fade-up {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: none; }
+}
+.sk-fade-up { animation: sk-fade-up 0.55s cubic-bezier(0.16, 1, 0.3, 1) both; }
