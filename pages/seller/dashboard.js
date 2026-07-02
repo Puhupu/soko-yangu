@@ -27,6 +27,7 @@ export default function SellerDashboard() {
   const [saving,    setSaving]    = useState(false);
   const [error,     setError]     = useState("");
   const [newOrder,  setNewOrder]  = useState(null);
+  const [orderFilter, setOrderFilter] = useState("all");
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -115,6 +116,12 @@ export default function SellerDashboard() {
     setProducts((ps) => ps.filter((p) => p.id !== id));
   }
 
+  async function toggleActive(p) {
+    const next = p.is_active === false;
+    await supabase.from("products").update({ is_active: next }).eq("id", p.id);
+    setProducts((ps) => ps.map((x) => x.id === p.id ? { ...x, is_active: next } : x));
+  }
+
   function startEdit(p) {
     setForm({ title: p.title, description: p.description || "", price: p.price, image_url: p.image_url || "", category: p.category || "Other" });
     setEditing(p.id); setShowForm(true); setError("");
@@ -124,8 +131,9 @@ export default function SellerDashboard() {
   function cancelForm() { setForm(EMPTY); setEditing(null); setShowForm(false); setError(""); }
 
   // Analytics
-  const totalRevenue    = orders.reduce((s, o) => s + o.product_price, 0);
-  const deliveredRev    = orders.filter((o) => o.status === "delivered").reduce((s, o) => s + o.product_price, 0);
+  const lineTotal       = (o) => o.product_price * (o.quantity || 1);
+  const totalRevenue    = orders.reduce((s, o) => s + lineTotal(o), 0);
+  const deliveredRev    = orders.filter((o) => o.status === "delivered").reduce((s, o) => s + lineTotal(o), 0);
   const pendingOrders   = orders.filter((o) => o.status === "pending");
   const confirmedOrders = orders.filter((o) => o.status === "confirmed");
   const productCounts   = {};
@@ -325,20 +333,29 @@ export default function SellerDashboard() {
               </div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {products.map((p) => (
-                  <div key={p.id} className="bg-white dark:bg-[#141414] rounded-2xl border border-gray-100 dark:border-[#2a2a2a] overflow-hidden hover:shadow-md transition-shadow">
-                    <img src={p.image_url || NO_IMAGE} alt={p.title} className="w-full aspect-square object-cover bg-gray-100 dark:bg-[#1a1a1a]" onError={(e) => { e.target.src = NO_IMAGE; }} />
+                {products.map((p) => {
+                  const hidden = p.is_active === false;
+                  return (
+                  <div key={p.id} className={`bg-white dark:bg-[#141414] rounded-2xl border border-gray-100 dark:border-[#2a2a2a] overflow-hidden hover:shadow-md transition-shadow ${hidden ? "opacity-60" : ""}`}>
+                    <div className="relative">
+                      <img src={p.image_url || NO_IMAGE} alt={p.title} className="w-full aspect-square object-cover bg-gray-100 dark:bg-[#1a1a1a]" onError={(e) => { e.target.src = NO_IMAGE; }} />
+                      {hidden && (
+                        <span className="absolute top-2 left-2 bg-gray-900/80 text-white text-xs font-bold px-2.5 py-1 rounded-full">Hidden</span>
+                      )}
+                    </div>
                     <div className="p-4">
                       <h3 className="font-bold text-gray-900 dark:text-white line-clamp-2 leading-snug">{p.title}</h3>
                       <p className="text-gray-900 dark:text-white font-black text-lg mt-1">{ksh(p.price)}</p>
                       {p.description && <p className="text-gray-500 dark:text-[#a0a0a0] text-xs mt-1.5 line-clamp-2">{p.description}</p>}
                       <div className="flex gap-2 mt-4">
                         <button onClick={() => startEdit(p)} className="flex-1 text-sm bg-gray-100 dark:bg-[#1a1a1a] text-gray-700 dark:text-[#a0a0a0] py-2 rounded-xl font-semibold hover:bg-gray-200 dark:hover:bg-[#2a2a2a] transition-colors">Edit</button>
+                        <button onClick={() => toggleActive(p)} className="flex-1 text-sm bg-gray-100 dark:bg-[#1a1a1a] text-gray-700 dark:text-[#a0a0a0] py-2 rounded-xl font-semibold hover:bg-gray-200 dark:hover:bg-[#2a2a2a] transition-colors">{hidden ? "Show" : "Hide"}</button>
                         <button onClick={() => handleDelete(p.id)} className="flex-1 text-sm bg-red-50 dark:bg-red-950 text-red-600 dark:text-red-400 py-2 rounded-xl font-semibold hover:bg-red-100 dark:hover:bg-red-900/50 transition-colors">Delete</button>
                       </div>
                     </div>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
@@ -353,9 +370,40 @@ export default function SellerDashboard() {
                 <p className="font-semibold">No orders yet</p>
               </div>
             ) : (
-              <div className="space-y-3">
-                {orders.map((o) => <OrderCard key={o.id} order={o} />)}
-              </div>
+              <>
+                <div className="flex gap-2 mb-5 flex-wrap">
+                  {[
+                    { key: "all",       label: `All (${orders.length})` },
+                    { key: "pending",   label: `Pending (${pendingOrders.length})` },
+                    { key: "confirmed", label: `Confirmed (${confirmedOrders.length})` },
+                    { key: "delivered", label: `Delivered (${orders.filter((o) => o.status === "delivered").length})` },
+                  ].map((f) => (
+                    <button
+                      key={f.key}
+                      onClick={() => setOrderFilter(f.key)}
+                      className={`px-4 py-1.5 rounded-full text-sm font-bold border-2 transition-all ${
+                        orderFilter === f.key
+                          ? "bg-gray-900 text-white border-gray-900 dark:bg-white dark:text-black dark:border-white"
+                          : "bg-white dark:bg-[#141414] text-gray-600 dark:text-[#a0a0a0] border-gray-200 dark:border-[#2a2a2a] hover:border-gray-400 dark:hover:border-[#555]"
+                      }`}
+                    >
+                      {f.label}
+                    </button>
+                  ))}
+                </div>
+                {(() => {
+                  const shown = orderFilter === "all" ? orders : orders.filter((o) => o.status === orderFilter);
+                  return shown.length === 0 ? (
+                    <div className="text-center py-12 text-gray-400 dark:text-[#a0a0a0]">
+                      <p className="font-medium">No {orderFilter} orders</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {shown.map((o) => <OrderCard key={o.id} order={o} />)}
+                    </div>
+                  );
+                })()}
+              </>
             )}
           </div>
         )}
@@ -370,8 +418,8 @@ function OrderCard({ order: o }) {
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <p className="font-bold text-gray-900 dark:text-white">{o.product_title}</p>
-            <p className="text-gray-900 dark:text-white font-black">{ksh(o.product_price)}</p>
+            <p className="font-bold text-gray-900 dark:text-white">{o.product_title}{o.quantity > 1 ? ` ×${o.quantity}` : ""}</p>
+            <p className="text-gray-900 dark:text-white font-black">{ksh(o.product_price * (o.quantity || 1))}</p>
           </div>
           <p className="text-sm text-gray-600 dark:text-[#a0a0a0] mt-1.5">👤 {o.buyer_name} · 📞 {o.buyer_phone}</p>
           <p className="text-sm text-gray-600 dark:text-[#a0a0a0]">📍 {o.delivery_location}</p>
